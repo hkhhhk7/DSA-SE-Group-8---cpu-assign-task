@@ -205,7 +205,7 @@ class AssignCPUTasks {
             result.push(generateActionMessage('assignment', 'compare', ['size of CPU0', 'size of CPU1'], [size0, size1]));
 
             let targetCPU, targetIndex;
-            if (size1 > size0) {
+            if (size1 < size0) {
                 targetCPU = this.#CPU1;
                 targetIndex = 1;
             }
