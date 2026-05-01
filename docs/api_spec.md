@@ -10,6 +10,7 @@
 | `number` | Number | 任務的唯一編號 | 不可重複 |
 | `startTime` | Number | 任務抵達系統的時間 | $\ge 0$ |
 | `duration` | Number | 任務執行所需時間 | $> 0$ |
+** BE 追記：請調用 create 方法，不要用內建的 constructor，不然會漏一些初始化 / 訊息
 
 **前端傳入範例：**
 ```json
