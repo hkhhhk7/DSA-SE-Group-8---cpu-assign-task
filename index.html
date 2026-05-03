@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CPU Task Assignment Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-a" aria-hidden="true"></div>
+    <div class="bg-orb orb-b" aria-hidden="true"></div>
+
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">DSA SE Group 8</p>
+        <h1>CPU Task Assignment Visualizer</h1>
+        <p class="subtitle">
+          Paste task input JSON, run the assignment flow, and inspect emitted create/action/state messages.
+        </p>
+      </header>
+
+      <section class="card input-card">
+        <div class="card-title-row">
+          <h2>Task Input</h2>
+          <button id="fillSampleBtn" type="button" class="ghost-btn">Load Sample</button>
+        </div>
+        <p class="hint">Required fields: number (unique), startTime (&gt;= 0), duration (&gt; 0). getInfo messages are skipped.</p>
+        <textarea id="taskInput" spellcheck="false" aria-label="Task input JSON"></textarea>
+
+        <div class="actions">
+          <button id="runBtn" type="button" class="primary-btn">Run Assignment</button>
+          <button id="clearBtn" type="button" class="secondary-btn">Clear Output</button>
+        </div>
+
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card output-card">
+        <div class="card-title-row">
+          <h2>Queue Animation</h2>
+        </div>
+        <div class="play-controls">
+          <button id="playBtn" type="button" class="primary-btn">Play</button>
+          <button id="pauseBtn" type="button" class="secondary-btn">Pause</button>
+          <button id="stepBtn" type="button" class="ghost-btn">Step</button>
+          <button id="resetAnimBtn" type="button" class="secondary-btn">Reset</button>
+        </div>
+
+        <p id="currentMessage" class="current-message">Current: -</p>
+
+        <div class="task-pool-wrap">
+          <h3>Task Pool</h3>
+          <div id="taskPool" class="task-pool" aria-label="Task pool"></div>
+        </div>
+
+        <div class="queues-wrap" aria-label="CPU queues">
+          <div class="queue-card">
+            <div class="queue-header-row">
+              <h3>CPU0 Queue</h3>
+              <span id="cpu0State" class="queue-state">idle</span>
+            </div>
+            <div id="cpu0Lane" class="queue-lane"></div>
+          </div>
+
+          <div class="queue-card">
+            <div class="queue-header-row">
+              <h3>CPU1 Queue</h3>
+              <span id="cpu1State" class="queue-state">idle</span>
+            </div>
+            <div id="cpu1Lane" class="queue-lane"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card output-card">
+        <div class="card-title-row">
+          <h2>Output Messages</h2>
+          <span id="messageCount" class="pill">0 messages</span>
+        </div>
+        <ol id="outputList" class="output-list" aria-label="Output messages"></ol>
+      </section>
+    </main>
+
+    <script src="./assignCPUTasks.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

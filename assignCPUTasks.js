@@ -65,8 +65,16 @@ class Task {
         return [this.#startTime, [generateGetInfoMessage(this.getNumber(), 'startTime', this.#startTime)]];
     }
 
+    getStartTimeValue() {
+        return this.#startTime;
+    }
+
     getDuration() {
         return [this.#duration, [generateGetInfoMessage(this.getNumber(), 'duration', this.#duration)]];
+    }
+
+    getDurationValue() {
+        return this.#duration;
     }
 
     getNumber() {
@@ -95,29 +103,37 @@ class Queue {
     }
 
     push(data) {
-        // data should be number here
         let result = [];
         this.#size += 1; result.push(generateActionMessage(this.getName(), 'increase', 'size', 1));
-        this.#data.push(data); result.push(generateActionMessage(this.getName(), 'push', this.getName(), data));
+        this.#data.push(data); result.push(generateActionMessage(this.getName(), 'push', this.getName(), `task ${data.taskNumber}`));
         return result;
     }
 
     pop() {
+        if (this.#size <= 0) {
+            return [];
+        }
+
         let result = [];
-        result.push(generateActionMessage(this.getName(), 'pop', this.getName(), `task ${this.#data[0].getNumber()}`));
+        let removedTask = this.#data.shift();
+        result.push(generateActionMessage(this.getName(), 'pop', this.getName(), `task ${removedTask.taskNumber}`));
         this.#size -= 1; result.push(generateActionMessage(this.getName(), 'decrease', 'size', 1));
 
         // move the data for animation
         for (let i = 0; i < this.#size; i++) {
-            result.push(generateActionMessage(this.getName(), 'move', `task ${this.#data[i + 1].getNumber()}`, i));
-            this.#data[i] = this.#data[i + 1];
+            result.push(generateActionMessage(this.getName(), 'move', `task ${this.#data[i].taskNumber}`, i));
         }
 
         return result;
     }
 
     peek() {
-        return [this.#data[0], [generateActionMessage(this.getName(), 'peek', this.getName(), this.#data[0])]];
+        if (this.#size <= 0) {
+            return [Infinity, [generateActionMessage(this.getName(), 'peek', this.getName(), Infinity)]];
+        }
+
+        let front = this.#data[0];
+        return [front.endTime, [generateActionMessage(this.getName(), 'peek', this.getName(), front.endTime)]];
     }
 
     getSize() {
@@ -145,7 +161,7 @@ class AssignCPUTasks {
         }
 
         this.#tasks = tasks.sort(
-            (a, b) => (a.getStartTime() <= b.getStartTime())
+            (a, b) => (a.getStartTimeValue() - b.getStartTimeValue())
         );
     }
 
@@ -170,8 +186,8 @@ class AssignCPUTasks {
             result.push(...message0);
             result.push(...message1);
 
-            let needPopOut = true;
             for (let CPU of [this.#CPU0, this.#CPU1]) {
+                let needPopOut = true;
                 while (needPopOut) {
                     let [size, getSizeMessage] = CPU.getSize();
                     result.push(...getSizeMessage);
@@ -215,28 +231,45 @@ class AssignCPUTasks {
             }
 
             result.push(generateActionMessage('assignment', 'assign', targetCPU.getName(), `task ${task.getNumber()}`));
-            let endTime = Math.max(curTime + duration, backs[targetIndex] + duration);
+            let endTime = Math.max(curTime, backs[targetIndex]) + duration;
             result.push(generateActionMessage(targetCPU.getName(), 'compare', ['current time + duration', 'back time + duration'], [curTime + duration, backs[targetIndex] + duration]));
             result.push(generateActionMessage(targetCPU.getName(), 'update', `back${targetIndex}`, endTime));
             backs[targetIndex] = endTime;
+            result.push(...targetCPU.push({ taskNumber: task.getNumber(), endTime: endTime }));
         }
 
         return result;
     }
 }
 
-let tasks = [];
-let result = [];
-for (let i = 0; i < 5; i++) {
-    let [newTask, messages] = Task.create(i, i, 1);
-    tasks.push(newTask);
-    result.push(...messages);
+if (typeof window !== 'undefined') {
+    window.Task = Task;
+    window.AssignCPUTasks = AssignCPUTasks;
 }
 
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        Task,
+        Queue,
+        AssignCPUTasks
+    };
+}
 
-let [assignment, messages] = AssignCPUTasks.create(tasks);
-result.push(...messages);
-messages = assignment.assignTasks();
-result.push(...messages);
+if (typeof require !== 'undefined' && require.main === module) {
+    let tasks = [];
+    let result = [];
+    for (let i = 0; i < 5; i++) {
+        let [newTask, messages] = Task.create(i, i, 1);
+        tasks.push(newTask);
+        result.push(...messages);
+    }
 
-console.log(result);
+    let assignment;
+    let messages;
+    [assignment, messages] = AssignCPUTasks.create(tasks);
+    result.push(...messages);
+    messages = assignment.assignTasks();
+    result.push(...messages);
+
+    console.log(result);
+}
