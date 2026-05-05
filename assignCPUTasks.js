@@ -181,7 +181,6 @@ class AssignCPUTasks {
 
     // return status that greater equal than startTime
     assignTasks(startTime = 0) {
-        console.log(`startTime: ${startTime}`);
         // type check
         if (!Number.isFinite(startTime)) {
             throw new TypeError(generateTypeError('startTime', 'Number', 'AssignCPUTasks.assignTasks'));
@@ -191,26 +190,32 @@ class AssignCPUTasks {
         let result = [];
         let backs = [0, 0];
 
+        let recordMessage = false;
+        let addMessage = function (message) {
+            if (recordMessage) {
+                if (Array.isArray(message)) result.push(...message);
+                else result.push(message);
+            }
+        };
+
         if (startTime === 0) {
-            result.push(generateCreateMessage('Number', 'back0'));
-            result.push(generateCreateMessage('Number', 'back1'));
+            recordMessage = true;
+            addMessage(generateCreateMessage('Number', 'back0'));
+            addMessage(generateCreateMessage('Number', 'back1'));
         }
 
-        let recordMessage = false;
         for (const task of this.#tasks) {
             // fist step: pop out executed processes
             let [curTime, message0] = task.getStartTime();
             let [duration, message1] = task.getDuration();
 
-            if (startTime === 0) {
-                result.push(...message0);
-                result.push(...message1);
-            }
+            addMessage(message0);
+            addMessage(message1);
 
 
             if (result.length === 0 && curTime >= startTime) {
                 recordMessage = true;
-                result.push({
+                addMessage({
                     back0: backs[0],
                     back1: backs[1],
                     CPU0: Array.from(this.#CPU0),
@@ -218,15 +223,11 @@ class AssignCPUTasks {
                 })
             }
 
-            let addMessage = function (message) {
-                if (recordMessage) result.push(message);
-            };
-
             for (let CPU of [this.#CPU0, this.#CPU1]) {
                 let needPopOut = true;
                 while (needPopOut) {
                     let [size, getSizeMessage] = CPU.getSize();
-                    addMessage(...getSizeMessage);
+                    addMessage(getSizeMessage);
                     addMessage(generateActionMessage(CPU.getName(), 'compare', ['size', 'zero'], [size, 0]));
                     if (size <= 0) {
                         addMessage(generateStateMessage(CPU.getName(), 'is empty'));
@@ -234,12 +235,12 @@ class AssignCPUTasks {
                         break;
                     }
                     let [frontTaskTime, message] = CPU.peek();
-                    addMessage(...message);
+                    addMessage(message);
                     addMessage(generateActionMessage(CPU.getName(), 'compare', ['front task time', 'current time'], [frontTaskTime, curTime]));
                     if (frontTaskTime <= curTime) {
                         addMessage(generateStateMessage(CPU.getName(), 'need compare'));
                         let message = CPU.pop();
-                        addMessage(...message);
+                        addMessage(message);
                     }
                     else {
                         addMessage(generateStateMessage(CPU.getName(), 'finish compare'));
@@ -251,8 +252,8 @@ class AssignCPUTasks {
 
             let [size0, sizemessage0] = this.#CPU0.getSize();
             let [size1, sizemessage1] = this.#CPU1.getSize();
-            addMessage(...sizemessage0);
-            addMessage(...sizemessage1);
+            addMessage(sizemessage0);
+            addMessage(sizemessage1);
 
             addMessage(generateActionMessage('assignment', 'compare', ['size of CPU0', 'size of CPU1'], [size0, size1]));
 
@@ -271,7 +272,7 @@ class AssignCPUTasks {
             addMessage(generateActionMessage(targetCPU.getName(), 'compare', ['current time + duration', 'back time + duration'], [curTime + duration, backs[targetIndex] + duration]));
             addMessage(generateActionMessage(targetCPU.getName(), 'update', `back${targetIndex}`, endTime));
             backs[targetIndex] = endTime;
-            addMessage(...targetCPU.push({ taskNumber: task.getNumber(), endTime: endTime }));
+            addMessage(targetCPU.push({ taskNumber: task.getNumber(), endTime: endTime }));
         }
 
         return result;
@@ -304,7 +305,7 @@ if (typeof require !== 'undefined' && require.main === module) {
     let messages;
     [assignment, messages] = AssignCPUTasks.create(tasks);
     // result.push(...messages);
-    messages = assignment.assignTasks(1);
+    messages = assignment.assignTasks();
     result.push(...messages);
 
     console.log(result);
