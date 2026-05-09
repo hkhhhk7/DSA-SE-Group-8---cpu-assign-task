@@ -48,6 +48,10 @@
           <button id="stepBtn" type="button" class="ghost-btn">Step</button>
           <button id="resetAnimBtn" type="button" class="secondary-btn">Reset</button>
         </div>
+        <div class="timeline-wrap">
+  <label for="timelineSlider">進度：</label>
+  <input type="range" id="timelineSlider" min="0" max="100" value="0" disabled>
+</div>
 
         <p id="currentMessage" class="current-message">Current: -</p>
 
@@ -55,6 +59,13 @@
           <h3>Task Pool</h3>
           <div id="taskPool" class="task-pool" aria-label="Task pool"></div>
         </div>
+
+        <div class="time-board">
+          <span> 當下處理時間: <span id="sysTimeDisplay" class="time-num">-</span></span>
+          <span> CPU0 預計完工: <span id="cpu0EndDisplay" class="time-num">0</span></span>
+          <span> CPU1 預計完工: <span id="cpu1EndDisplay" class="time-num">0</span></span>
+        </div>
+        <div class="queues-wrap" aria-label="CPU queues">
 
         <div class="queues-wrap" aria-label="CPU queues">
           <div class="queue-card">
