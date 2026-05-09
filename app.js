@@ -1,17 +1,19 @@
 const SAMPLE_TASKS = [
-    { number: 0, startTime: 0, duration: 1 },
+    { number: 0, startTime: 0, duration: 7 },
     { number: 1, startTime: 1, duration: 2 },
     { number: 2, startTime: 1, duration: 3 },
-    { number: 3, startTime: 2, duration: 1 }
+    { number: 3, startTime: 2, duration: 1 },
+    { number: 4, startTime: 2, duration: 5 },
+    { number: 5, startTime: 2, duration: 2 },
+    { number: 6, startTime: 3, duration: 4 },
+    { number: 7, startTime: 4, duration: 1 }
 ];
 
 const taskInputEl = document.getElementById("taskInput");
 const runBtnEl = document.getElementById("runBtn");
 const clearBtnEl = document.getElementById("clearBtn");
 const fillSampleBtnEl = document.getElementById("fillSampleBtn");
-const outputListEl = document.getElementById("outputList");
 const statusEl = document.getElementById("status");
-const messageCountEl = document.getElementById("messageCount");
 
 const playBtnEl = document.getElementById("playBtn");
 const pauseBtnEl = document.getElementById("pauseBtn");
@@ -32,7 +34,12 @@ const timelineSliderEl = document.getElementById("timelineSlider");
 
 let playbackTimer = null;
 let playbackIndex = -1;
+let playbackTimeIndex = -1;
+let currentTime = 0;
 let displayMessages = [];
+let messageTimeMap = [];
+let timePoints = [];
+let pendingBackTime = { CPU0: 0, CPU1: 0 };
 let queueModel = { CPU0: [], CPU1: [] };
 
 function setStatus(message, type) {
@@ -78,16 +85,40 @@ function formatMessageForDisplay(msg) {
     return JSON.stringify(msg);
 }
 
-function renderOutput(messages) {
-    outputListEl.innerHTML = "";
-    for (let i = 0; i < messages.length; i += 1) {
-        const li = document.createElement("li");
-        li.textContent = JSON.stringify(messages[i]);
-        li.style.animationDelay = `${Math.min(i * 14, 300)}ms`;
-        outputListEl.appendChild(li);
+function extractTimePoints(messages) {
+    const times = new Set();
+    const msgTimeMap = [];
+    let currentCursorTime = 0;
+    
+    for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        let msgTime = currentCursorTime;
+        
+        // compare(..., "current time") establishes the scheduler's current time.
+        if (msg.action === "compare" && Array.isArray(msg.object)) {
+            if (msg.object[1] === "current time" && Array.isArray(msg.val)) {
+                currentCursorTime = msg.val[1];
+                msgTime = currentCursorTime;
+            }
+        }
+
+        // update(backX, endTime) is used only to extend timeline range,
+        // not to relocate queue/state messages in replay order.
+        if (
+            msg.action === "update" &&
+            (msg.object === "back0" || msg.object === "back1") &&
+            Number.isFinite(msg.val)
+        ) {
+            times.add(msg.val);
+        }
+        
+        msgTimeMap[i] = msgTime;
+        times.add(msgTime);
     }
-    messageCountEl.textContent = `${messages.length} messages`;
+    
+    return [Array.from(times).sort((a, b) => a - b), msgTimeMap];
 }
+
 
 function buildTasks(rawTasks) {
     if (!Array.isArray(rawTasks) || rawTasks.length === 0) {
@@ -148,14 +179,16 @@ function renderTaskPoolFromInput() {
     }
 }
 
+
+
 function renderQueue(name) {
     const laneEl = name === "CPU0" ? cpu0LaneEl : cpu1LaneEl;
     laneEl.innerHTML = "";
 
-    for (const taskNo of queueModel[name]) {
+    for (const entry of queueModel[name]) {
         const chip = document.createElement("div");
         chip.className = "queue-chip";
-        chip.textContent = `T${taskNo}`;
+        chip.textContent = `T${entry.taskNo}`;
         laneEl.appendChild(chip);
     }
 }
@@ -168,6 +201,8 @@ function markTaskAssigned(taskNo) {
     el.classList.add("assigned");
 }
 
+
+
 function clearPlaybackTimer() {
     if (playbackTimer) {
         clearInterval(playbackTimer);
@@ -175,9 +210,10 @@ function clearPlaybackTimer() {
     }
 }
 
-function resetAnimationState() {
-    clearPlaybackTimer();
+function resetAnimationViewState() {
     playbackIndex = -1;
+    currentTime = 0;
+    pendingBackTime = { CPU0: 0, CPU1: 0 };
     queueModel = { CPU0: [], CPU1: [] };
     cpu0StateEl.textContent = "idle";
     cpu1StateEl.textContent = "idle";
@@ -188,6 +224,18 @@ function resetAnimationState() {
     renderTaskPoolFromInput();
     renderQueue("CPU0");
     renderQueue("CPU1");
+}
+
+function resetAnimationState() {
+    clearPlaybackTimer();
+    playbackTimeIndex = -1;
+    resetAnimationViewState();
+    // 將時間軸復位到起始位置（直覺行為）
+    if (timelineSliderEl) {
+        try {
+            timelineSliderEl.value = 0;
+        } catch (_) {}
+    }
 }
 
 function applyMessageToAnimation(message) {
@@ -208,11 +256,18 @@ function applyMessageToAnimation(message) {
         return;
     }
     if (message.action === "update") {
-        if (message.object === "back0") cpu0EndDisplayEl.textContent = message.val;
-        if (message.object === "back1") cpu1EndDisplayEl.textContent = message.val;
+        if (message.object === "back0") {
+            cpu0EndDisplayEl.textContent = message.val;
+            if (Number.isFinite(message.val)) pendingBackTime.CPU0 = message.val;
+        }
+        if (message.object === "back1") {
+            cpu1EndDisplayEl.textContent = message.val;
+            if (Number.isFinite(message.val)) pendingBackTime.CPU1 = message.val;
+        }
     }
     if (message.action === "compare" && Array.isArray(message.object)) {
         if (message.object[1] === "current time" && Array.isArray(message.val)) {
+            currentTime = message.val[1];
             sysTimeDisplayEl.textContent = message.val[1];
         }
     }
@@ -222,7 +277,7 @@ function applyMessageToAnimation(message) {
         if (message.action === "push") {
             const taskNo = taskNumberFromText(message.val);
             if (Number.isFinite(taskNo)) {
-                queueModel[cpuName].push(taskNo);
+                queueModel[cpuName].push({ taskNo, endTime: pendingBackTime[cpuName] });
                 markTaskAssigned(taskNo);
                 renderQueue(cpuName);
             }
@@ -242,20 +297,50 @@ function applyMessageToAnimation(message) {
     }
 }
 
+function pruneCompletedTasksByTime(targetTime) {
+    queueModel.CPU0 = queueModel.CPU0.filter((entry) => entry.endTime > targetTime);
+    queueModel.CPU1 = queueModel.CPU1.filter((entry) => entry.endTime > targetTime);
+    renderQueue("CPU0");
+    renderQueue("CPU1");
+}
+
+function rebuildAnimationAtTime(targetTime) {
+    resetAnimationViewState();
+    currentTime = targetTime;
+
+    for (let i = 0; i < displayMessages.length; i++) {
+        const msgTime = messageTimeMap[i];
+        if (msgTime <= targetTime) {
+            playbackIndex = i;
+            applyMessageToAnimation(displayMessages[i]);
+        } else {
+            break;
+        }
+    }
+
+    pruneCompletedTasksByTime(targetTime);
+    if (sysTimeDisplayEl) sysTimeDisplayEl.textContent = String(targetTime);
+}
+
 function stepForward() {
-    if (playbackIndex >= displayMessages.length - 1) {
+    if (!timePoints.length) {
         clearPlaybackTimer();
         return;
     }
 
-    playbackIndex += 1;
-    //  讓拉桿隨動畫前進
-    if (timelineSliderEl) timelineSliderEl.value = playbackIndex; 
-    applyMessageToAnimation(displayMessages[playbackIndex]);
+    if (playbackTimeIndex >= timePoints.length - 1) {
+        clearPlaybackTimer();
+        return;
+    }
+
+    playbackTimeIndex += 1;
+    const targetTime = timePoints[playbackTimeIndex];
+    rebuildAnimationAtTime(targetTime);
+    if (timelineSliderEl) timelineSliderEl.value = playbackTimeIndex;
 }
 
 function playAnimation() {
-    if (!displayMessages.length || playbackTimer) {
+    if (!timePoints.length || playbackTimer) {
         return;
     }
     playbackTimer = setInterval(stepForward, 1000);
@@ -273,22 +358,31 @@ function runAssignmentFromInput() {
 
         const allMessages = [...createTaskMessages, ...createCpuMessages, ...actionMessages];
         displayMessages = normalizeDisplayMessages(allMessages);
-        renderOutput(displayMessages);
         
-        //  關鍵：解鎖拉桿並設定最大值
-        if (timelineSliderEl && displayMessages.length > 0) {
+        // Extract time points and create message-to-time mapping
+        [timePoints, messageTimeMap] = extractTimePoints(displayMessages);
+        
+        // Setup timeline slider based on time points
+        if (timelineSliderEl && timePoints.length > 0) {
             timelineSliderEl.disabled = false;
-            timelineSliderEl.max = displayMessages.length - 1;
+            timelineSliderEl.min = 0;
+            timelineSliderEl.max = timePoints.length - 1;
             timelineSliderEl.value = 0;
         }
 
         resetAnimationState();
+        if (timePoints.length > 0) {
+            playbackTimeIndex = 0;
+            rebuildAnimationAtTime(timePoints[0]);
+            if (timelineSliderEl) timelineSliderEl.value = 0;
+        }
         setStatus("Assignment finished，按 Play 可看 Queue 動畫", "ok");
     } catch (err) {
         displayMessages = [];
-        renderOutput([]);
+        timePoints = [];
+        messageTimeMap = [];
         resetAnimationState();
-        if (timelineSliderEl) timelineSliderEl.disabled = true; // 失敗時鎖住拉桿
+        if (timelineSliderEl) timelineSliderEl.disabled = true;
         setStatus(err.message || "執行失敗", "error");
     }
 }
@@ -302,12 +396,16 @@ function loadSample() {
 runBtnEl.addEventListener("click", runAssignmentFromInput);
 clearBtnEl.addEventListener("click", () => {
     displayMessages = [];
-    renderOutput([]);
+    timePoints = [];
+    messageTimeMap = [];
+    playbackTimeIndex = -1;
     resetAnimationState();
     if (timelineSliderEl) timelineSliderEl.disabled = true;
     setStatus("Output cleared.", "");
 });
 fillSampleBtnEl.addEventListener("click", loadSample);
+
+
 
 playBtnEl.addEventListener("click", playAnimation);
 pauseBtnEl.addEventListener("click", clearPlaybackTimer);
@@ -317,18 +415,19 @@ stepBtnEl.addEventListener("click", () => {
 });
 resetAnimBtnEl.addEventListener("click", resetAnimationState);
 
-//  新增拉桿的拖拉監聽器（實現瞬間跳轉）
+//  新增拉桿的拖拉監聽器（實現瞬間跳轉）基於時間
 if (timelineSliderEl) {
     timelineSliderEl.addEventListener("input", (e) => {
-        clearPlaybackTimer(); 
-        const targetIndex = parseInt(e.target.value);
-        
-        resetAnimationState();
-        for (let i = 0; i <= targetIndex; i++) {
-            playbackIndex = i;
-            applyMessageToAnimation(displayMessages[i]);
+        clearPlaybackTimer();
+        const targetTimeIndex = parseInt(e.target.value);
+        if (!Number.isFinite(targetTimeIndex) || targetTimeIndex < 0 || targetTimeIndex >= timePoints.length) {
+            return;
         }
-        timelineSliderEl.value = targetIndex; 
+
+        playbackTimeIndex = targetTimeIndex;
+        const targetTime = timePoints[targetTimeIndex];
+        rebuildAnimationAtTime(targetTime);
+        timelineSliderEl.value = targetTimeIndex;
     });
 }
 
