@@ -33,7 +33,6 @@ const cpu1EndDisplayEl = document.getElementById("cpu1EndDisplay");
 const timelineSliderEl = document.getElementById("timelineSlider");
 
 let playbackTimer = null;
-let playbackIndex = -1;
 let playbackTimeIndex = -1;
 let currentTime = 0;
 let displayMessages = [];
@@ -64,24 +63,20 @@ function normalizeDisplayMessages(messages) {
 function formatMessageForDisplay(msg) {
     if (!msg) return "-";
     
-    // 1. 處理 Create 訊息
     if (msg.action === "create") {
         return ` 建立 ${msg.type} (ID: ${msg.instanceID})`;
     }
     
-    // 2. 處理 State 狀態訊息
     if (msg.state) {
         return ` ${msg.instanceID} 狀態更新：${msg.state}`;
     }
     
-    // 3. 處理一般 Action 動作訊息
     if (msg.action) {
         let objText = msg.object ? ` ➜ 目標: ${Array.isArray(msg.object) ? `[${msg.object.join(", ")}]` : msg.object}` : "";
         let valText = msg.val !== undefined ? ` (數值: ${Array.isArray(msg.val) ? `[${msg.val.join(", ")}]` : msg.val})` : "";
         return ` ${msg.instanceID} 執行 ${msg.action}${objText}${valText}`;
     }
     
-    // 如果都不符合，才退回顯示 JSON
     return JSON.stringify(msg);
 }
 
@@ -118,7 +113,6 @@ function extractTimePoints(messages) {
     
     return [Array.from(times).sort((a, b) => a - b), msgTimeMap];
 }
-
 
 function buildTasks(rawTasks) {
     if (!Array.isArray(rawTasks) || rawTasks.length === 0) {
@@ -179,8 +173,6 @@ function renderTaskPoolFromInput() {
     }
 }
 
-
-
 function renderQueue(name) {
     const laneEl = name === "CPU0" ? cpu0LaneEl : cpu1LaneEl;
     laneEl.innerHTML = "";
@@ -201,8 +193,6 @@ function markTaskAssigned(taskNo) {
     el.classList.add("assigned");
 }
 
-
-
 function clearPlaybackTimer() {
     if (playbackTimer) {
         clearInterval(playbackTimer);
@@ -211,7 +201,6 @@ function clearPlaybackTimer() {
 }
 
 function resetAnimationViewState() {
-    playbackIndex = -1;
     currentTime = 0;
     pendingBackTime = { CPU0: 0, CPU1: 0 };
     queueModel = { CPU0: [], CPU1: [] };
@@ -230,11 +219,8 @@ function resetAnimationState() {
     clearPlaybackTimer();
     playbackTimeIndex = -1;
     resetAnimationViewState();
-    // 將時間軸復位到起始位置（直覺行為）
     if (timelineSliderEl) {
-        try {
-            timelineSliderEl.value = 0;
-        } catch (_) {}
+        timelineSliderEl.value = 0;
     }
 }
 
@@ -308,10 +294,14 @@ function rebuildAnimationAtTime(targetTime) {
     resetAnimationViewState();
     currentTime = targetTime;
 
+    if (targetTime <= 0) {
+        if (sysTimeDisplayEl) sysTimeDisplayEl.textContent = "0";
+        return;
+    }
+
     for (let i = 0; i < displayMessages.length; i++) {
         const msgTime = messageTimeMap[i];
         if (msgTime <= targetTime) {
-            playbackIndex = i;
             applyMessageToAnimation(displayMessages[i]);
         } else {
             break;
@@ -371,11 +361,8 @@ function runAssignmentFromInput() {
         }
 
         resetAnimationState();
-        if (timePoints.length > 0) {
-            playbackTimeIndex = 0;
-            rebuildAnimationAtTime(timePoints[0]);
-            if (timelineSliderEl) timelineSliderEl.value = 0;
-        }
+        playbackTimeIndex = -1;
+        if (timelineSliderEl) timelineSliderEl.value = 0;
         setStatus("Assignment finished，按 Play 可看 Queue 動畫", "ok");
     } catch (err) {
         displayMessages = [];
@@ -404,8 +391,6 @@ clearBtnEl.addEventListener("click", () => {
     setStatus("Output cleared.", "");
 });
 fillSampleBtnEl.addEventListener("click", loadSample);
-
-
 
 playBtnEl.addEventListener("click", playAnimation);
 pauseBtnEl.addEventListener("click", clearPlaybackTimer);

@@ -76,11 +76,6 @@ class Task {
         return [this.#duration, [generateGetInfoMessage(this.getNumber(), 'duration', this.#duration)]];
     }
 
-    // return with only message
-    getDurationValue() {
-        return this.#duration;
-    }
-
     // get id number of this task
     getNumber() {
         return this.#number;
