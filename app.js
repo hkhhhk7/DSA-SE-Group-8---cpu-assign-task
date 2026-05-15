@@ -82,12 +82,18 @@ function formatMessageForDisplay(msg) {
 
 function extractTimePoints(messages) {
     const times = new Set();
-    const msgTimeMap = [];
+    const msgTimeMapAll = [];
     let currentCursorTime = 0;
 
     for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
         let msgTime = currentCursorTime;
+
+        // getInfo(startTime) advances the scheduler cursor
+        if (msg.action === "getInfo" && msg.attribute === "startTime" && Number.isFinite(msg.content)) {
+            currentCursorTime = msg.content;
+            msgTime = currentCursorTime;
+        }
 
         // compare(..., "current time") establishes the scheduler's current time.
         if (msg.action === "compare" && Array.isArray(msg.object)) {
@@ -97,8 +103,7 @@ function extractTimePoints(messages) {
             }
         }
 
-        // update(backX, endTime) is used only to extend timeline range,
-        // not to relocate queue/state messages in replay order.
+        // update(backX, endTime) extends timeline range
         if (
             msg.action === "update" &&
             (msg.object === "back0" || msg.object === "back1") &&
@@ -107,11 +112,19 @@ function extractTimePoints(messages) {
             times.add(msg.val);
         }
 
-        msgTimeMap[i] = msgTime;
+        msgTimeMapAll[i] = msgTime;
         times.add(msgTime);
     }
 
-    return [Array.from(times).sort((a, b) => a - b), msgTimeMap];
+    // Build mapping for displayed messages (filter out getInfo)
+    const msgTimeMapForDisplay = [];
+    for (let i = 0, j = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        if (msg.action === 'getInfo') continue;
+        msgTimeMapForDisplay[j++] = msgTimeMapAll[i];
+    }
+
+    return [Array.from(times).sort((a, b) => a - b), msgTimeMapForDisplay];
 }
 
 function buildTasks(rawTasks) {
@@ -230,7 +243,7 @@ function resetAnimationState() {
     playbackTimeIndex = -1;
     resetAnimationViewState();
     if (timelineSliderEl) {
-        timelineSliderEl.value = 0;
+        timelineSliderEl.value = -1;
     }
 }
 
@@ -304,8 +317,8 @@ function rebuildAnimationAtTime(targetTime) {
     resetAnimationViewState();
     currentTime = targetTime;
 
-    if (targetTime <= 0) {
-        if (sysTimeDisplayEl) sysTimeDisplayEl.textContent = "0";
+    if (targetTime < 0) {
+        if (sysTimeDisplayEl) sysTimeDisplayEl.textContent = "-";
         return;
     }
 
@@ -373,20 +386,20 @@ function runAssignmentFromInput() {
         const allMessages = [...createTaskMessages, ...createCpuMessages, ...actionMessages];
         displayMessages = normalizeDisplayMessages(allMessages);
 
-        // Extract time points and create message-to-time mapping
-        [timePoints, messageTimeMap] = extractTimePoints(displayMessages);
+        // Extract time points and create message-to-time mapping using full message stream
+        [timePoints, messageTimeMap] = extractTimePoints(allMessages);
 
-        // Setup timeline slider based on time points
+        // Setup timeline slider based on time points (start at -1 for initial state)
         if (timelineSliderEl && timePoints.length > 0) {
             timelineSliderEl.disabled = false;
-            timelineSliderEl.min = 0;
+            timelineSliderEl.min = -1;
             timelineSliderEl.max = timePoints.length - 1;
-            timelineSliderEl.value = 0;
+            timelineSliderEl.value = -1;
         }
 
         resetAnimationState();
         playbackTimeIndex = -1;
-        if (timelineSliderEl) timelineSliderEl.value = 0;
+        if (timelineSliderEl) timelineSliderEl.value = -1;
         setStatus("Assignment finished，按 Play 可看 Queue 動畫", "ok");
     } catch (err) {
         errorHandling(err.message);
@@ -424,12 +437,12 @@ if (timelineSliderEl) {
     timelineSliderEl.addEventListener("input", (e) => {
         clearPlaybackTimer();
         const targetTimeIndex = parseInt(e.target.value);
-        if (!Number.isFinite(targetTimeIndex) || targetTimeIndex < 0 || targetTimeIndex >= timePoints.length) {
+        if (!Number.isFinite(targetTimeIndex) || targetTimeIndex < -1 || targetTimeIndex >= timePoints.length) {
             return;
         }
 
         playbackTimeIndex = targetTimeIndex;
-        const targetTime = timePoints[targetTimeIndex];
+        const targetTime = targetTimeIndex === -1 ? -1 : timePoints[targetTimeIndex];
         rebuildAnimationAtTime(targetTime);
         timelineSliderEl.value = targetTimeIndex;
     });
