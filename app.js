@@ -128,6 +128,10 @@ function buildTasks(rawTasks) {
 
     for (const item of rawTasks) {
         const { number, startTime, duration } = item || {};
+        if (item.number === undefined || item.startTime === undefined || item.duration === undefined) {
+            throw new TypeError("Task 必須具備 number/startTime/dutaion");
+        }
+
         const values = [number, startTime, duration];
         if (!values.every(Number.isFinite)) {
             throw new TypeError("number/startTime/duration 必須都是在 0 到 1e10 之間的數字");
