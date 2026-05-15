@@ -1,6 +1,6 @@
 # DSA SE Group8 - CPU Scheduling Visualizer
 
-> 透過互動式介面與動態演算法，將DSA HW2 handwriting part曾經出現的cpu assinment問題進行實作，以queue的實作來表現cpu排程不同task的實際使用情形
+> 透過互動式介面與動態演算法，將DSA HW2 handwriting part曾經出現的cpu assignment問題進行實作，以queue的實作來表現cpu排程不同task的實際使用情形
 
 
 ## 介面操作方法 (How to Use)
@@ -61,11 +61,11 @@
 * **Step 4: 狀態更新與預測 (State Update)**
   決定目標 CPU 後，將任務推入該 CPU 的佇列尾端，並依據該 CPU 目前最後一個任務的完工時間，計算出新任務的預計完工時間 (`endTime`)，以供下一輪迴圈判斷使用。
 
-## 📂 專案架構 (Project Structure)
+## 專案架構 (Project Structure)
 
 ```text
 ├── index.html          # 系統主入口與 UI 介面
 ├── styles.css          # 介面樣式表
 ├── app.js              # 前端邏輯、DOM 操作與時間軸播放器
-└── assignCPUTasks.js   # 核心演算法：Queue 資料結構與排程邏輯
+└── assignCPUTasks.js   # 後端：Queue 資料結構與排程邏輯
 ```
