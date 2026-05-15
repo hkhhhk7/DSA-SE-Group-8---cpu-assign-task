@@ -1,5 +1,9 @@
 function generateTypeError(variantName, targetType, functionName) {
-    return `${variantName} is not instance of "${targetType}" in ${functionName}`
+    return `${variantName} is not instance of "${targetType}" in ${functionName}`;
+}
+
+function generateRangeError(variantName, targetRange, functionName) {
+    return `${variantName} has to be ${targetRange} in ${functionName}`;
 }
 
 function generateCreateMessage(type, instanceID) {
@@ -51,6 +55,16 @@ class Task {
         if (!Number.isFinite(duration)) {
             throw new TypeError(generateTypeError('duration', 'Number', 'Task.constructor'));
         }
+        if (number > 1e10 || number < 0) {
+            throw new RangeError(generateRangeError('number', '0 ~ 1e10', 'Task.constructor'));
+        }
+        if (startTime > 1e10 || startTime < 0) {
+            throw new RangeError(generateRangeError('startTime', '0 ~ 1e10', 'Task.constructor'));
+        }
+        if (duration > 1e10 || duration < 0) {
+            throw new RangeError(generateRangeError('duration', '0 ~ 1e10', 'Task.constructor'));
+        }
+
         this.#number = number;
         this.#startTime = startTime;
         this.#duration = duration;

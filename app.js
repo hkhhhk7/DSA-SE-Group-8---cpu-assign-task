@@ -62,21 +62,21 @@ function normalizeDisplayMessages(messages) {
 }
 function formatMessageForDisplay(msg) {
     if (!msg) return "-";
-    
+
     if (msg.action === "create") {
         return ` 建立 ${msg.type} (ID: ${msg.instanceID})`;
     }
-    
+
     if (msg.state) {
         return ` ${msg.instanceID} 狀態更新：${msg.state}`;
     }
-    
+
     if (msg.action) {
         let objText = msg.object ? ` ➜ 目標: ${Array.isArray(msg.object) ? `[${msg.object.join(", ")}]` : msg.object}` : "";
         let valText = msg.val !== undefined ? ` (數值: ${Array.isArray(msg.val) ? `[${msg.val.join(", ")}]` : msg.val})` : "";
         return ` ${msg.instanceID} 執行 ${msg.action}${objText}${valText}`;
     }
-    
+
     return JSON.stringify(msg);
 }
 
@@ -84,11 +84,11 @@ function extractTimePoints(messages) {
     const times = new Set();
     const msgTimeMap = [];
     let currentCursorTime = 0;
-    
+
     for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
         let msgTime = currentCursorTime;
-        
+
         // compare(..., "current time") establishes the scheduler's current time.
         if (msg.action === "compare" && Array.isArray(msg.object)) {
             if (msg.object[1] === "current time" && Array.isArray(msg.val)) {
@@ -106,17 +106,20 @@ function extractTimePoints(messages) {
         ) {
             times.add(msg.val);
         }
-        
+
         msgTimeMap[i] = msgTime;
         times.add(msgTime);
     }
-    
+
     return [Array.from(times).sort((a, b) => a - b), msgTimeMap];
 }
 
 function buildTasks(rawTasks) {
     if (!Array.isArray(rawTasks) || rawTasks.length === 0) {
         throw new Error("請至少新增一個任務");
+    }
+    if (rawTasks.length > 1000) {
+        throw new RangeError("任務數量太多了！");
     }
 
     const builtTasks = [];
@@ -127,7 +130,10 @@ function buildTasks(rawTasks) {
         const { number, startTime, duration } = item || {};
         const values = [number, startTime, duration];
         if (!values.every(Number.isFinite)) {
-            throw new TypeError("number/startTime/duration 必須都是數字");
+            throw new TypeError("number/startTime/duration 必須都是在 0 到 1e10 之間的數字");
+        }
+        if (!values.every(x => (0 <= x && x <= 1e10))) {
+            throw new RangeError("number/startTime/duration 必須都是在 0 到 1e10 之間的數字");
         }
         if (startTime < 0) {
             throw new Error("startTime 必須 >= 0");
@@ -233,7 +239,7 @@ function applyMessageToAnimation(message) {
 
         // 觸發 CSS 動畫
         stateEl.classList.remove("updating");
-        void stateEl.offsetWidth; 
+        void stateEl.offsetWidth;
         stateEl.classList.add("updating");
         return;
     }
@@ -348,10 +354,10 @@ function runAssignmentFromInput() {
 
         const allMessages = [...createTaskMessages, ...createCpuMessages, ...actionMessages];
         displayMessages = normalizeDisplayMessages(allMessages);
-        
+
         // Extract time points and create message-to-time mapping
         [timePoints, messageTimeMap] = extractTimePoints(displayMessages);
-        
+
         // Setup timeline slider based on time points
         if (timelineSliderEl && timePoints.length > 0) {
             timelineSliderEl.disabled = false;
