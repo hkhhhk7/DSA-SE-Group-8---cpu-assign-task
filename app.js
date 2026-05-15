@@ -342,11 +342,25 @@ function playAnimation() {
     playbackTimer = setInterval(stepForward, 1000);
 }
 
+function errorHandling(errorMessage) {
+    displayMessages = [];
+    timePoints = [];
+    messageTimeMap = [];
+    resetAnimationState();
+    if (timelineSliderEl) timelineSliderEl.disabled = true;
+    setStatus(errorMessage || "執行失敗", "error");
+}
+
 function runAssignmentFromInput() {
+    let parsed;
     try {
         setStatus("", "");
-
-        const parsed = JSON.parse(taskInputEl.value);
+        parsed = JSON.parse(taskInputEl.value);
+    } catch (err) {
+        errorHandling("傳入資料不符合 JSON 格式");
+        return;
+    }
+    try {
         const [tasks, createTaskMessages] = buildTasks(parsed);
 
         const [assignment, createCpuMessages] = AssignCPUTasks.create(tasks);
@@ -371,12 +385,7 @@ function runAssignmentFromInput() {
         if (timelineSliderEl) timelineSliderEl.value = 0;
         setStatus("Assignment finished，按 Play 可看 Queue 動畫", "ok");
     } catch (err) {
-        displayMessages = [];
-        timePoints = [];
-        messageTimeMap = [];
-        resetAnimationState();
-        if (timelineSliderEl) timelineSliderEl.disabled = true;
-        setStatus(err.message || "執行失敗", "error");
+        errorHandling(err.message);
     }
 }
 
