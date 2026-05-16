@@ -45,24 +45,23 @@ class Task {
     #duration;
 
     constructor(number, startTime, duration) {
+        const variants = {
+            'Number': number,
+            'startTime': startTime,
+            'duration': duration
+        };
+
         // type check
-        if (!Number.isFinite(number)) {
-            throw new TypeError(generateTypeError('number', 'Number', 'Task.constructor'));
-        }
-        if (!Number.isFinite(startTime)) {
-            throw new TypeError(generateTypeError('startTime', 'Number', 'Task.constructor'));
-        }
-        if (!Number.isFinite(duration)) {
-            throw new TypeError(generateTypeError('duration', 'Number', 'Task.constructor'));
-        }
-        if (number > 1e10 || number < 0) {
-            throw new RangeError(generateRangeError('number', '0 ~ 1e10', 'Task.constructor'));
-        }
-        if (startTime > 1e10 || startTime < 0) {
-            throw new RangeError(generateRangeError('startTime', '0 ~ 1e10', 'Task.constructor'));
-        }
-        if (duration > 1e10 || duration < 0) {
-            throw new RangeError(generateRangeError('duration', '0 ~ 1e10', 'Task.constructor'));
+        for (const [key, value] of Object.entries(variants)) {
+            if (!Number.isFinite(value)) {
+                throw new TypeError(generateTypeError(key, 'Number', 'Task.constructor'));
+            }
+            if (!Number.isInteger(value)) {
+                throw new TypeError(generateTypeError(key, 'Integer', 'Task.constructor'));
+            }
+            if (value > 1e10 || number < 0) {
+                throw new RangeError(generateRangeError(key, '0 ~ 1e10', 'Task.constructor'));
+            }
         }
 
         this.#number = number;

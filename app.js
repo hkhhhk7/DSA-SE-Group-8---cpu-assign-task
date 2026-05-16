@@ -146,12 +146,10 @@ function buildTasks(rawTasks) {
         }
 
         const values = [number, startTime, duration];
-        if (!values.every(Number.isFinite)) {
-            throw new TypeError("number/startTime/duration 必須都是在 0 到 1e10 之間的數字");
+        if (!values.every(x => Number.isFinite(x) && Number.isInteger(x) && 0 <= x && x <= 1e10)) {
+            throw new TypeError("number/startTime/duration 必須都是在 0 到 1e10 之間的整數");
         }
-        if (!values.every(x => (0 <= x && x <= 1e10))) {
-            throw new RangeError("number/startTime/duration 必須都是在 0 到 1e10 之間的數字");
-        }
+
         if (startTime < 0) {
             throw new Error("startTime 必須 >= 0");
         }
